@@ -1,6 +1,5 @@
-# TrueFoundry-like Platform — Implementation Blueprint
+# Agent-Foundry Platform — Implementation Blueprint
 
-> Based on TrueFoundry's architecture (screenshot: `Screenshot 2026-07-27 203241.png`) and website analysis.  
 > Architecture pillars: **Discover & Govern → AI Gateway → Models / MCP Servers / Agents → Deploy & Scale → Observe**
 
 ---
@@ -449,29 +448,29 @@ For organizations with multiple Kubernetes clusters:
 ### 8.3 Developer SDK (Python)
 
 ```python
-pip install truefoundry-sdk
+pip install agent-foundry-sdk
 ```
 
 ```python
-from truefoundry import TrueFoundry
+from agent-foundry import agent-foundry
 
-tf = TrueFoundry(api_key="tfk_...")
+af = agent-foundry(api_key="tfk_...")
 
 # Deploy a model
-tf.models.deploy(
+af.models.deploy(
     name="llama-3-8b",
     model_id="meta-llama/Llama-3.1-8B-Instruct",
     gpu_count=1
 )
 
 # Call through gateway
-response = tf.gateway.chat(
+response = af.gateway.chat(
     model="llama-3-8b",
     messages=[{"role": "user", "content": "Hello"}]
 )
 
 # Deploy an agent
-tf.agents.deploy(
+af.agents.deploy(
     name="support-agent",
     framework="langgraph",
     graph_path="./graph.py",
@@ -552,7 +551,6 @@ E2E tests         → Playwright: UI flows for deploy → call → observe
 | 9. Enterprise | 24–30 | RBAC, SSO, compliance |
 | 10. Hardening | Ongoing | Load tests, chaos, security |
 
-**Estimated team:** 6–8 engineers (2 backend, 1 infra/DevOps, 1 ML infra, 1 frontend, 1 platform/SDK, 1 QA, 1 PM)  
 **Estimated timeline to MVP (gateway + models + basic UI):** ~16 weeks  
 **Estimated timeline to enterprise-ready v1:** ~30 weeks
 
