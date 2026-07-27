@@ -58,6 +58,194 @@
 
 ---
 
+## Developer Setup
+
+### Prerequisites
+
+| Tool | Minimum version | Purpose |
+|---|---|---|
+| Python | 3.11 | All backend services |
+| Node.js | 20 LTS | Control-plane UI |
+| Docker + Compose | 24 / 2.24 | Local stack |
+| PostgreSQL client (`psql`) | 16 | Running migrations manually |
+| Terraform | 1.7 | Infrastructure modules |
+
+---
+
+### Quickstart (Docker — recommended)
+
+```bash
+git clone <repo>
+cd Agent-Foundry
+
+# 1. Set up environment variables
+cp .env.example .env
+# Edit .env — at minimum set GATEWAY_SECRET_KEY and NEXTAUTH_SECRET
+
+# 2. Start the full stack
+docker compose up
+```
+
+Services become available at:
+
+| Service | URL |
+|---|---|
+| AI Gateway | http://localhost:8000 |
+| Model Registry | http://localhost:8001 |
+| MCP Gateway | http://localhost:8002 |
+| Agent Runtime | http://localhost:8003 |
+| Observer (Prometheus) | http://localhost:9090 |
+| Control Plane UI | http://localhost:3000 |
+
+To start a single service and its dependencies:
+```bash
+docker compose up gateway          # also starts postgres and redis
+docker compose up control-plane    # also starts gateway
+```
+
+---
+
+### Running a service locally (without Docker)
+
+Each Python service is an independent package. Work inside its directory:
+
+```bash
+cd gateway                         # or model-registry, mcp-gateway, agent-runtime, observer
+python -m venv .venv
+source .venv/bin/activate
+pip install -e ".[dev]"
+
+# Export the env vars the service needs (see .env.example for reference)
+export GATEWAY_DATABASE_URL="postgresql+asyncpg://postgres:postgres@localhost:5432/agent_foundry"
+export GATEWAY_REDIS_URL="redis://localhost:6379/0"
+
+uvicorn gateway.main:app --reload --port 8000
+```
+
+Replace `gateway` / `gateway.main:app` / `8000` for other services:
+
+| Directory | Uvicorn target | Port |
+|---|---|---|
+| `gateway/` | `gateway.main:app` | 8000 |
+| `model-registry/` | `model_registry.main:app` | 8001 |
+| `mcp-gateway/` | `mcp_gateway.main:app` | 8002 |
+| `agent-runtime/` | `agent_runtime.main:app` | 8003 |
+| `observer/` | `observer.main:app` | — |
+
+#### Control plane (Next.js)
+
+```bash
+cd control-plane
+npm install
+npm run dev        # http://localhost:3000 with hot reload
+npm run build      # production build
+npm run lint       # ESLint
+```
+
+---
+
+### Running the database migrations
+
+Requires a running PostgreSQL instance (use `docker compose up postgres` for local dev).
+
+```bash
+# From the repo root
+export DATABASE_URL="postgresql+asyncpg://postgres:postgres@localhost:5432/agent_foundry"
+
+# Apply all pending migrations
+alembic -c migrations/alembic.ini upgrade head
+
+# Roll back one revision
+alembic -c migrations/alembic.ini downgrade -1
+
+# Check current revision
+alembic -c migrations/alembic.ini current
+
+# Generate a new auto-migration after changing migrations/models.py
+alembic -c migrations/alembic.ini revision --autogenerate -m "describe your change"
+```
+
+> **Note:** `DATABASE_URL` must use the `postgresql+asyncpg://` driver prefix — Alembic's async engine requires it.
+
+---
+
+### Running tests
+
+Tests live inside each service directory. `asyncio_mode = "auto"` is set globally so no `@pytest.mark.asyncio` decorator is needed.
+
+```bash
+# All tests for one service
+cd gateway && pytest
+
+# One file
+cd gateway && pytest tests/test_health.py
+
+# One test
+cd gateway && pytest tests/test_health.py::test_health_status_200
+
+# Verbose + stop on first failure
+cd gateway && pytest -x -v
+
+# Migration and ORM model tests (run from migrations/)
+cd migrations && pip install -e ".[dev]" && pytest
+```
+
+Tests use `httpx.AsyncClient(transport=httpx.ASGITransport(app=app))` — no live server is needed. SDK tests mock HTTP calls via `respx`.
+
+---
+
+### Project structure
+
+```
+Agent-Foundry/
+├── gateway/            # AI Gateway — routing, rate limiting, guardrails
+├── model-registry/     # Model catalog, commercial connectors, vLLM
+├── mcp-gateway/        # MCP server registry and proxy
+├── agent-runtime/      # Agent deployment and execution engine
+├── observer/           # OTel pipeline, Prometheus metrics, ClickHouse
+├── control-plane/      # Next.js 14 dashboard (App Router)
+├── sdk/                # Python SDK (pip install agent-foundry-sdk)
+├── migrations/         # Alembic migrations + shared SQLAlchemy ORM models
+├── infra/
+│   ├── modules/        # Terraform modules: aws/ azure/ gcp/ onprem/ airgapped/
+│   └── environments/   # dev/ staging/ prod/ (each calls a module)
+├── docker-compose.yml  # Full local stack
+└── .env.example        # All required environment variables with descriptions
+```
+
+Each Python service follows the same internal layout:
+```
+<service>/
+├── src/<package>/
+│   ├── main.py       # FastAPI app + /v1/health
+│   └── settings.py   # pydantic-settings with env prefix
+├── tests/
+│   └── conftest.py   # shared httpx ASGI client fixture
+├── Dockerfile
+└── pyproject.toml    # deps, pytest config (pythonpath = ["src"])
+```
+
+---
+
+### Environment variables reference
+
+All variables are documented in `.env.example`. Key ones:
+
+| Variable | Service | Description |
+|---|---|---|
+| `GATEWAY_SECRET_KEY` | gateway | JWT signing secret — change in production |
+| `GATEWAY_DATABASE_URL` | gateway | `postgresql+asyncpg://...` connection string |
+| `GATEWAY_REDIS_URL` | gateway | Redis connection string |
+| `DATABASE_URL` | all others | Shared DB connection (no prefix) |
+| `KEYCLOAK_ISSUER` | control-plane | OIDC issuer URL |
+| `KEYCLOAK_ID` | control-plane | OAuth2 client ID |
+| `KEYCLOAK_SECRET` | control-plane | OAuth2 client secret |
+| `NEXTAUTH_SECRET` | control-plane | NextAuth.js signing secret |
+| `NEXT_PUBLIC_API_URL` | control-plane | Gateway base URL (browser-visible) |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | all | OTel collector gRPC endpoint |
+
+---
+
 ## Phase 1 — Foundation & Core API Layer (Weeks 1–4)
 
 ### Goal

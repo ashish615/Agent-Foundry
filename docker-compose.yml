@@ -1,0 +1,101 @@
+version: "3.9"
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: agent_foundry
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  gateway:
+    build: ./gateway
+    ports:
+      - "8000:8000"
+    env_file: .env
+    environment:
+      GATEWAY_DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/agent_foundry
+      GATEWAY_REDIS_URL: redis://redis:6379/0
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  model-registry:
+    build: ./model-registry
+    ports:
+      - "8001:8000"
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/agent_foundry
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  mcp-gateway:
+    build: ./mcp-gateway
+    ports:
+      - "8002:8000"
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/agent_foundry
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  agent-runtime:
+    build: ./agent-runtime
+    ports:
+      - "8003:8000"
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/agent_foundry
+      REDIS_URL: redis://redis:6379/1
+      GATEWAY_URL: http://gateway:8000
+      MCP_PROXY_URL: http://mcp-gateway:8000
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  observer:
+    build: ./observer
+    ports:
+      - "9090:9090"
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/agent_foundry
+
+  control-plane:
+    build: ./control-plane
+    ports:
+      - "3000:3000"
+    env_file: .env
+    environment:
+      NEXT_PUBLIC_API_URL: http://gateway:8000
+    depends_on:
+      - gateway
+
+volumes:
+  postgres_data:
