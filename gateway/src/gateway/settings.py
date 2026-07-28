@@ -9,3 +9,5 @@ class Settings(BaseSettings):
     cors_origins: list[str] = ["*"]
     otlp_endpoint: str = "http://localhost:4317"
     secret_key: str = "change-me-in-production"
+    jwt_algorithm: str = "HS256"
+    jwt_expire_minutes: int = 60

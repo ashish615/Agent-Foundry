@@ -7,9 +7,11 @@ from decimal import Decimal
 from sqlalchemy import (
     ARRAY,
     JSON,
+    Boolean,
     DateTime,
     Enum,
     ForeignKey,
+    Integer,
     Numeric,
     String,
     Text,
@@ -77,3 +79,22 @@ class ApiKey(Base):
     last_used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     user: Mapped["User"] = relationship(back_populates="api_keys")
+
+
+class Model(Base):
+    __tablename__ = "models"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    slug: Mapped[str] = mapped_column(Text, nullable=False, unique=True)
+    display_name: Mapped[str] = mapped_column(Text, nullable=False)
+    provider: Mapped[str] = mapped_column(Text, nullable=False)
+    endpoint_url: Mapped[str | None] = mapped_column(Text, nullable=True)
+    context_window: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    max_output_tokens: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    input_cost_per_1m: Mapped[Decimal | None] = mapped_column(Numeric(12, 6), nullable=True)
+    output_cost_per_1m: Mapped[Decimal | None] = mapped_column(Numeric(12, 6), nullable=True)
+    capabilities: Mapped[list[str]] = mapped_column(ARRAY(String), nullable=False, server_default="{}")
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="true")
+    meta_json: Mapped[dict] = mapped_column(JSON, nullable=False, server_default="{}")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())

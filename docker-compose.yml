@@ -28,7 +28,9 @@ services:
       retries: 5
 
   gateway:
-    build: ./gateway
+    build:
+      context: .
+      dockerfile: gateway/Dockerfile
     ports:
       - "8000:8000"
     env_file: .env
