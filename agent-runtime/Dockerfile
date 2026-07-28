@@ -1,12 +1,12 @@
 FROM python:3.11-slim AS build
 WORKDIR /app
 COPY pyproject.toml .
-RUN pip install --no-cache-dir hatchling && pip install --no-cache-dir -e .
+COPY src/ src/
+RUN pip install --no-cache-dir .
 
 FROM python:3.11-slim
 WORKDIR /app
 COPY --from=build /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
 COPY --from=build /usr/local/bin /usr/local/bin
-COPY src/ src/
 EXPOSE 8000
 CMD ["uvicorn", "agent_runtime.main:app", "--host", "0.0.0.0", "--port", "8000"]
